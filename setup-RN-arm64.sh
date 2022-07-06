@@ -18,6 +18,7 @@ STAG="${GREEN}[+]${NO_COLOR}"		# Success tag
 ETAG="${RED}[-]${NO_COLOR}"		# Error tag
 
 # Versions
+BUCK_VERSION=2021.05.05.01
 BUCK_JAVA_VERSION=11
 CMAKE_VERSION=3.18.1
 NDK_VERSION=r23
@@ -75,7 +76,7 @@ Print_help() {
 
 Print_versions() {
     VER_TXT="${CYAN}${BOLD}Package|Version|Source${NO_COLOR}\n"
-    VER_TXT+="Buck|Latest|https://github.com/facebook/buck.git\n"
+    VER_TXT+="Buck|$BUCK_VERSION|https://github.com/facebook/buck.git\n"
     VER_TXT+="Buck Java|$BUCK_JAVA_VERSION|Buck\n"
     VER_TXT+="CMake|$CMAKE_VERSION|sdkmanager\n"
     VER_TXT+="JDK|$SDK_VERSION|https://dl.google.com/android/repository/\n"
@@ -129,7 +130,7 @@ if [ $INSTALL_UPDATE -eq 1 ]; then
     Debug_msg "> Update system packages"
     sudo apt-get update > $OUT; Result_msg "apt update failed!"
     sudo apt-get dist-upgrade -y > $OUT; Result_msg "Packages updated" "apt dist-upgrade failed!"
-    sudo apt-get autoremove > $OUT; Result_msg "apt autoremove failed!"
+    sudo apt-get autoremove -y > $OUT; Result_msg "apt autoremove failed!"
 fi
 
 if [ $INSTALL_PKGS -eq 1 ]; then
@@ -148,7 +149,6 @@ if [ $INSTALL_PKGS -eq 1 ]; then
         nodejs \
         screen \
         watchman \
-        sdkmanager \
         openjdk-11-jdk \
         openjdk-11-jre \
         android-tools-adb \
@@ -178,7 +178,7 @@ if [ $INSTALL_BUCK -eq 1 ]; then
         Debug_msg "Download buck"
 
         [ $DEBUG -eq 0 ] && QUIET='--quiet' || QUIET=''
-        git clone $QUIET --depth 1 https://github.com/facebook/buck.git > $OUT; Result_msg "Buck download failed!"
+        git clone $QUIET --depth 1 --branch v${BUCK_VERSION} https://github.com/facebook/buck.git > $OUT; Result_msg "Buck download failed!"
         cd buck
 
         Debug_msg "Build buck"
