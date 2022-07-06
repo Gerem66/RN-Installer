@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Source:	https://github.com/Gerem66/RN-Installer
 
 # Check privileges
@@ -23,9 +22,9 @@ BUCK_JAVA_VERSION=11
 CMAKE_VERSION=3.18.1
 NDK_VERSION=r23
 ANDROID_BUILD_VERSION=31
-ANDROID_TOOLS_VERSION=30.0.3 #31.0.0
+ANDROID_TOOLS_VERSION=30.0.3
 SDK_VERSION=commandlinetools-linux-8512546_latest.zip
-
+NODE_VERSION=16.x
 
 
 # If contains one message, it will be shown if last command failed
@@ -68,6 +67,7 @@ Print_help() {
     echo -e "\t-nu | --no-update	Disable system update before installation (not recommended)"
     echo -e "\t-np | --no-packages	Disable packages installation (git, python, curl, ant, ...)"
     echo -e "\t-nb | --no-buck		Disable buck installation (skip clean too)"
+    echo -e "\t-nn | --no-node		Disable buck installation (skip clean too)"
     echo -e "\t-na | --no-android	Disable SDK/NDK installation (skip clean too)"
     echo -e "\t-nc | --no-config	Disable config settings (skip clean too)"
     exit 0
@@ -84,6 +84,7 @@ Print_versions() {
     VER_TXT+="Android tools|$ANDROID_TOOLS_VERSION|sdkmanager\n"
     VER_TXT+="npm|Latest|apt-get\n"
     VER_TXT+="react-native|Latest|npm\n"
+    VER_TXT+="Node|$NODE_VERSION|https://deb.nodesource.com/setup_${NODE_VERSION}"
 
     echo -e "$VER_TXT" | column -t -s "|" -c 50
     exit 0
@@ -97,6 +98,7 @@ UNSAFE=0		# Unsafe mode, not quit when errors occured
 INSTALL_UPDATE=1
 INSTALL_PKGS=1
 INSTALL_BUCK=1
+INSTALL_NODE=1
 INSTALL_ANDROID=1
 INSTALL_CONFIG=1
 
@@ -110,6 +112,7 @@ for i in "$@"; do
         -nu|--no-update)	INSTALL_UPDATE=0 ;;
         -np|--no-packages)	INSTALL_PKGS=0 ;;
         -nb|--no-buck)		INSTALL_BUCK=0 ;;
+        -nn|--no-node)		INSTALL_NODE=0 ;;
         -na|--no-android)	INSTALL_ANDROID=0 ;;
         -nc|--no-config)	INSTALL_CONFIG=0 ;;
         *)			echo "Unknown option $i"; exit 1 ;;
@@ -137,21 +140,25 @@ if [ $INSTALL_PKGS -eq 1 ]; then
         git \
         gcc \
         g++ \
-        npm \
+        nano \
         make \
         curl \
         cmake \
         unzip \
         nodejs \
-        python3 \
-        python3-distutils\
+        screen \
         watchman \
         sdkmanager \
-        openjdk-11-jdk > $OUT
+        openjdk-11-jdk \
+        openjdk-11-jre \
+        android-tools-adb \
+        python3 python3-distutils \
+        > $OUT
     Result_msg "Packages installed" "Packages installation failed!"
 
-    Debug_msg "Install react native with npm"
+    Debug_msg "Update npm and install react native"
     [ $DEBUG -eq 0 ] && SILENT='--silent' || SILENT=''
+    npm install $SILENT -g npm
     npm install $SILENT -g react-native > $OUT
     Result_msg "React native installation failed!"
 fi
@@ -194,6 +201,29 @@ fi
 
 
 
+# Install node & yarn
+
+if [ $INSTALL_NODE -eq 1 ]; then
+    Debug_msg "> Node"
+
+    # Clean
+    #TODO - clean...
+
+    if [ $CLEAN -eq 0 ]; then
+        curl -sL https://deb.nodesource.com/setup_${NODE_VERSION} | bash - > $OUT
+        Result_msg "Node downloading failed!"
+
+        [ $DEBUG -eq 0 ] && VERBOSE='-qq' || VERBOSE=''
+        apt-get update $QUIET > $OUT; Result_msg "Update packages failed!"
+        apt-get install $QUIET -y nodejs > $OUT; Result_msg "NodeJS installation failed!"
+        npm install -g yarn > $OUT; Result_msg "Npm: yarn installation failed!"
+
+        #rm -rf /var/lib/apt/lists/* # Why ?
+    fi
+fi
+
+
+
 # Install android SDK
 
 if [ $INSTALL_ANDROID -eq 1 ]; then
@@ -224,8 +254,8 @@ if [ $INSTALL_ANDROID -eq 1 ]; then
         #	system-images;android-21;google_apis;armeabi-v7a
 
         Debug_msg "Download platform-tools"
-        yes | sdkmanager --licenses > $OUT; Result_msg "SDK manager licenses not accepted!"
-        yes | sdkmanager "platform-tools" \
+        yes | sudo sdkmanager --licenses > $OUT; Result_msg "SDK manager licenses not accepted!"
+        yes | sudo sdkmanager "platform-tools" \
             "platforms;android-$ANDROID_BUILD_VERSION" \
             "build-tools;$ANDROID_TOOLS_VERSION" \
             "cmake;$CMAKE_VERSION" \
@@ -249,9 +279,15 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
 
     Debug_msg "> Configuration"
     STATE_DIR='/tmp/root-state'
-    chmod -R 0777 /tmp; Result_msg "Can't change /tmp directory permissions (to 0777)"
-    [ ! -d $STATE_DIR ] && ( mkdir $STATE_DIR; Result_msg "Can't create $STATE_DIR directory" )
-    chmod 0700 $STATE_DIR; Result_msg "Can't change $STATE_DIR directory permissions (to 0700)"
+    ANDROID_SDK_ROOT='/opt/android-sdk'
+
+    if [ $CLEAN -eq 0 ]; then
+        chmod -R 0777 /tmp; Result_msg "Can't change /tmp directory permissions (to 0777)"
+        [ ! -d $STATE_DIR ] && ( mkdir $STATE_DIR; Result_msg "Can't create $STATE_DIR directory" )
+        chmod 0700 $STATE_DIR; Result_msg "Can't change $STATE_DIR directory permissions (to 0700)"
+
+        chmod -R 777 "$ANDROID_SDK_ROOT"; Result_msg "Can't change "$ANDROID_SDK_ROOT" directory permissions (to 777)"
+    fi
 
     #FILES=('~/.')
     #FILE='./test'

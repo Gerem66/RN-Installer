@@ -13,3 +13,15 @@ OS: kali linux 2022.2 raspberry-pi-arm64\
 CPU: Broadcom BCM2711, Quad core Cortex-A72 (ARM v8) 64-bit SoC @ 1.5GHz\
 RAM: 4GB LPDDR4-3200 SDRAM
 
+## Usage
+- Get help: `sudo ./setup-RN-arm64.sh -h`
+- Get versions: `sudo ./setup-RN-arm64.sh -v`
+- Do nothing: `sudo ./setup-RN-arm64.sh -nu -np -nb -nn -na -nc`
+
+## TODO
+- [ ] Prevent multiple setups at same time
+- [ ] Fix npm package installation (The following packages have unmet dependencies: npm...)
+- [ ] Check node installation
+- [ ] Finish configuration (add/rem exports)
+- [ ] Check watchman installation
+- [ ] Check npm/npx & new project test
