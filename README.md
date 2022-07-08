@@ -21,6 +21,4 @@ RAM: 4GB LPDDR4-3200 SDRAM
 - Do nothing: `sudo ./setup-RN-arm64.sh -nu -np -nb -nn -na -nc`
 
 ## TODO
-- [x] Update aapt2 in jar with arm64 version
-- [x] Replace adb binary with arm64 version (in /bin)
-- [x] Clean gradle in clean mode
+- [ ] Test on other devices
