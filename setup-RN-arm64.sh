@@ -180,6 +180,7 @@ fi
 
 touch "$PREV_FILE"
 trap CtrlC INT
+TIME_START=$(date +%s)
 echo -e "\n${DTAG} START SETUP\n"
 
 
@@ -386,6 +387,17 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
             done
         done
 
+        # Build gradle
+        BEFOREPATH=$(pwd)
+        Debug_msg "Create temp project to build gradle (can take few minutes)" # Faster way ?
+        cd /tmp
+        npx react-native /tmp/init rn_app_gradle > $OUT 2>&1; Result_msg "Can't create temp project"
+        cd /tmp/rn_app_gradle/android
+        ./gradlew app:installDebug > $OUT 2>&1 # Fail because it's builded to amd64, but gradle built
+        mkdir -p /tmp/; Result_msg "Can't create /tmp/gradle directory"
+        cd $BEFOREPATH
+        rm -rf /tmp/rn_app_gradle; Result_msg "Can't remove temp project"
+
         # Replace adb (amd64) to arm64 version (installed with apt)
         PATH_ADB=$(which adb)
         cp $PATH_ADB $ANDROID_SDK_ROOT/platform-tools/adb > $OUT 2>&1
@@ -405,6 +417,10 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
     fi
 fi
 
+
+TIME_END=$(date +%s)
+TIME_DURATION=$(echo $((TIME_END-TIME_START)) | awk '{print int($1/60)"m "int($1%60)"s"}')
+
 echo ""
-Debug_msg "Finished"
+Debug_msg "Finished (in $TIME_DURATION)"
 [ -f "$PREV_FILE" ] && rm -f "$PREV_FILE"
