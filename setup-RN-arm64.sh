@@ -27,22 +27,73 @@ ANDROID_TOOLS_VERSION=30.0.3
 SDK_VERSION=commandlinetools-linux-8512546_latest.zip
 NODE_VERSION=16.x
 
+# Other
+PREV_FILE='/tmp/.rnsetup'	# To prevent multiple setups
+
+
+Exit() {
+    if [ $UNSAFE -eq 0 ]; then
+        if [ -f "$PREV_FILE" ]; then
+            rm "$PREV_FILE"
+        fi
+        exit $1
+    fi
+}
+
+CtrlC() {
+    UNSAFE=0
+    Exit 1
+}
+
+# $1 - File
+# $2 - Pattern
+# output - Line number if found, nothing otherwise
+# return
+#     0 if found
+#     1 if not found
+#     2 if an error occured
+#     
+GetLine() {
+    FILE=$1
+    PATTERN=$2
+    FOUND=$(grep -Fnx "$PATTERN" "$FILE" 2>/dev/null)
+    RESULT=$?
+
+    if [ $RESULT -gt 1 ]; then
+        return 2
+    fi
+
+    if [ -n "$FOUND" ]; then
+        LINE=$(echo "$FOUND" | cut -f1 -d ':')
+        echo "$LINE"
+        return 0 
+    fi
+
+    return 1
+}
+
+# $1 Filename
+# $2 Line number
+RemoveLine() {
+    sed -i -e "${2}d" $1
+}
 
 # If contains one message, it will be shown if last command failed
 # If contains two messages, first will be shown if last command success, and second if it failed
 Result_msg() {
     RESULT=$?
-    if [ $# -eq 1 ]; then
+    ARGS_LENGTH=$#
+    if [ $ARGS_LENGTH -eq 1 ]; then
         if [ $RESULT -ne 0 ]; then
             echo -e "$ETAG $1"
-            [ $UNSAFE -eq 0 ] && exit 1
+            Exit 1
         fi
-    elif [ $# -eq 2 ]; then
+    elif [ $ARGS_LENGTH -eq 2 ]; then
         if [ $RESULT -eq 0 ]; then
             echo -e "$STAG $1"
         else
             echo -e "$ETAG $2"
-            [ $UNSAFE -eq 0 ] && exit 1
+            Exit 1
         fi
     fi
 }
@@ -122,6 +173,13 @@ done
 
 
 
+if [ -f "$PREV_FILE" ]; then
+    echo "One setup is already in progress, exiting."
+    exit 1
+fi
+
+touch "$PREV_FILE"
+trap CtrlC INT
 echo -e "\n${DTAG} START SETUP\n"
 
 
@@ -281,33 +339,50 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
     STATE_DIR='/tmp/root-state'
     ANDROID_SDK_ROOT='/opt/android-sdk'
 
+    # Clean
+    ALL_FILES=( ".bashrc" ".zshrc" )
+    ALL_LINES=( "export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" "export PATH=\$PATH:\$ANDROID_SDK_ROOT/platform-tools" )
+
+    for USER in /home/*/; do
+        for FILE in "${ALL_FILES[@]}"; do
+            FILERC="${USER}${FILE}"
+            if [ ! -f ${FILERC} ]; then
+                continue
+            fi
+
+            for LINE in "${ALL_LINES[@]}"; do
+                LINE_NB=$(GetLine "$FILERC" "$LINE")
+                LINE_NB_STATUS=$?
+
+                if [ $LINE_NB_STATUS -ne 0 ] || [ -z $LINE_NB ]; then
+                    continue
+                fi
+                if [ $LINE_NB -gt 0 ]; then
+                    RemoveLine "$FILERC" "$LINE_NB"
+                    Result_msg "Line \"${LINE}\" can't be removed from file \"$FILERC\"!"
+                fi
+            done
+        done
+    done
+
     if [ $CLEAN -eq 0 ]; then
         chmod -R 0777 /tmp; Result_msg "Can't change /tmp directory permissions (to 0777)"
         [ ! -d $STATE_DIR ] && ( mkdir $STATE_DIR; Result_msg "Can't create $STATE_DIR directory" )
         chmod 0700 $STATE_DIR; Result_msg "Can't change $STATE_DIR directory permissions (to 0700)"
 
         chmod -R 777 "$ANDROID_SDK_ROOT"; Result_msg "Can't change "$ANDROID_SDK_ROOT" directory permissions (to 777)"
+
+        for USER in /home/*/; do
+            for FILE in "${ALL_FILES[@]}"; do
+                for LINE in "${ALL_LINES[@]}"; do
+                    FILERC="${USER}${FILE}"
+                    echo "$LINE" >> "$FILERC"; Result_msg "Can't add configuration to \"$FILERC\""
+                done
+            done
+        done
     fi
-
-    #FILES=('~/.')
-    #FILE='./test'
-    #PATTERN="abc"
-    #FOUND=$(grep -Fnx "$PATTERN" "$FILE")
-    #RESULT=$?
-
-    #if [ $RESULT -le 1 ]; then
-        # Remove lines if clean mode
-    #    if [ $CLEAN -eq 1 ] && [ -n "$FOUND" ]; then
-    #        LINE=$(echo "$FOUND" | cut -f1 -d ':')
-    #    fi
-
-        # Append otherwise
-
-    #else
-    #    echo "An error occured"
-    #fi
-
 fi
 
 echo ""
 Debug_msg "Finished"
+[ -f "$PREV_FILE" ] && rm "$PREV_FILE"

@@ -19,9 +19,8 @@ RAM: 4GB LPDDR4-3200 SDRAM
 - Do nothing: `sudo ./setup-RN-arm64.sh -nu -np -nb -nn -na -nc`
 
 ## TODO
-- [ ] Prevent multiple setups at same time
-- [ ] Fix npm package installation (The following packages have unmet dependencies: npm...)
-- [ ] Check node installation
-- [ ] Finish configuration (add/rem exports)
-- [ ] Check watchman installation
-- [ ] Check npm/npx & new project test
+- [x] Prevent multiple setups at same time
+- [x] Fix npm package installation (The following packages have unmet dependencies: npm...)
+- [ ] Update aapt2 in jar with arm64 version
+- [ ] Replace adb executable with arm64 version (in /bin)
+- [x] Finish configuration (add/rem exports)
