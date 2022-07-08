@@ -6,6 +6,8 @@
 - [Commandline tools / Android SDK](https://developer.android.com/studio/command-line)
 - [Android NDK](https://developer.android.com/ndk/downloads)
 - [Code based on this dockerfile](https://github.com/react-native-community/docker-android)
+- [Termux Packages](https://github.com/termux/termux-packages/issues/8350)
+    - [AAPT2 Prebuilt binary](https://github.com/rendiix/termux-aapt)
 
 ## Tested on
 Raspberry Pi 4B\
@@ -19,8 +21,6 @@ RAM: 4GB LPDDR4-3200 SDRAM
 - Do nothing: `sudo ./setup-RN-arm64.sh -nu -np -nb -nn -na -nc`
 
 ## TODO
-- [x] Prevent multiple setups at same time
-- [x] Fix npm package installation (The following packages have unmet dependencies: npm...)
-- [ ] Update aapt2 in jar with arm64 version
-- [ ] Replace adb executable with arm64 version (in /bin)
-- [x] Finish configuration (add/rem exports)
+- [x] Update aapt2 in jar with arm64 version
+- [x] Replace adb binary with arm64 version (in /bin)
+- [x] Clean gradle in clean mode

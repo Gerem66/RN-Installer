@@ -186,14 +186,14 @@ echo -e "\n${DTAG} START SETUP\n"
 
 if [ $INSTALL_UPDATE -eq 1 ]; then
     Debug_msg "> Update system packages"
-    sudo apt-get update > $OUT; Result_msg "apt update failed!"
-    sudo apt-get dist-upgrade -y > $OUT; Result_msg "Packages updated" "apt dist-upgrade failed!"
-    sudo apt-get autoremove -y > $OUT; Result_msg "apt autoremove failed!"
+    apt-get update > $OUT; Result_msg "apt update failed!"
+    apt-get dist-upgrade -y > $OUT; Result_msg "Packages updated" "apt dist-upgrade failed!"
+    apt-get autoremove -y > $OUT; Result_msg "apt autoremove failed!"
 fi
 
 if [ $INSTALL_PKGS -eq 1 ]; then
     Debug_msg "> Install default packages"
-    sudo apt-get install -y \
+    apt-get install -y \
         adb \
         ant \
         git \
@@ -228,15 +228,15 @@ if [ $INSTALL_BUCK -eq 1 ]; then
     export ANT_OPTS="-Xmx4096m"
 
     # Clean
-    [ -d ./buck ] && ( sudo rm -R buck/; Result_msg "Buck folder package removed" "Buck folder can't be removed!" )
-    [ -f /tmp/buck.pex ] && ( sudo rm /tmp/buck.pex; Result_msg "Buck .pex removed" "Buck .pex can't be removed!" )
-    [ -f /usr/local/bin/buck ] && ( sudo rm /usr/local/bin/buck; Result_msg "Buck binary removed" "Buck binary can't be removed!" )
+    [ -d ./buck ] && ( rm -rf buck/; Result_msg "Buck folder package removed" "Buck folder can't be removed!" )
+    [ -f /tmp/buck.pex ] && ( rm -f /tmp/buck.pex; Result_msg "Buck .pex removed" "Buck .pex can't be removed!" )
+    [ -f /usr/local/bin/buck ] && ( rm -f /usr/local/bin/buck; Result_msg "Buck binary removed" "Buck binary can't be removed!" )
 
     if [ $CLEAN -eq 0 ]; then
         Debug_msg "Download buck"
 
         [ $DEBUG -eq 0 ] && QUIET='--quiet' || QUIET=''
-        git clone $QUIET --depth 1 --branch v${BUCK_VERSION} https://github.com/facebook/buck.git > $OUT; Result_msg "Buck download failed!"
+        git clone $QUIET --depth 1 --branch v${BUCK_VERSION} https://github.com/facebook/buck.git > $OUT 2>&1; Result_msg "Buck download failed!"
         cd buck
 
         Debug_msg "Build buck"
@@ -249,10 +249,10 @@ if [ $INSTALL_BUCK -eq 1 ]; then
             --out /tmp/buck.pex \
             --verbose $VERBOSE \
             > $OUT; Result_msg "Buck build failed!"
-        sudo mv /tmp/buck.pex /usr/local/bin/buck; Result_msg "Move builded buck failed!"
+        mv /tmp/buck.pex /usr/local/bin/buck; Result_msg "Move builded buck failed!"
 
         cd ..
-        sudo rm -R buck/
+        rm -rf buck/
         Result_msg "Buck successfully installed" "Remove buck failed"
     fi
 fi
@@ -293,9 +293,9 @@ if [ $INSTALL_ANDROID -eq 1 ]; then
     ANDROID_SDK_TEMP_ZIP=/tmp/sdk.zip
 
     # Clean
-    [ -d ${ANDROID_HOME} ] && ( sudo rm -R ${ANDROID_HOME}; Result_msg "Android home \"${ANDROID_HOME}\" removed" "Android home \"${ANDROID_HOME}\" can't be removed!" )
-    [ -d ${ANDROID_SDK} ] && ( sudo rm -R ${ANDROID_SDK}; Result_msg "Android SDK \"${ANDROID_SDK}\" removed" "Android SDK \"${ANDROID_SDK}\" can't be removed!" )
-    [ -f ${ANDROID_SDK_TEMP_ZIP} ] && ( sudo rm ${ANDROID_SDK_TEMP_ZIP}; Result_msg "Temp file \"${ANDROID_SDK_TEMP_ZIP}\" removed" "Temp file \"${ANDROID_SDK_TEMP_ZIP}\" can't be removed!" )
+    [ -d ${ANDROID_HOME} ] && ( rm -rf ${ANDROID_HOME}; Result_msg "Android home \"${ANDROID_HOME}\" removed" "Android home \"${ANDROID_HOME}\" can't be removed!" )
+    [ -d ${ANDROID_SDK} ] && ( rm -rf ${ANDROID_SDK}; Result_msg "Android SDK \"${ANDROID_SDK}\" removed" "Android SDK \"${ANDROID_SDK}\" can't be removed!" )
+    [ -f ${ANDROID_SDK_TEMP_ZIP} ] && ( rm -f ${ANDROID_SDK_TEMP_ZIP}; Result_msg "Temp file \"${ANDROID_SDK_TEMP_ZIP}\" removed" "Temp file \"${ANDROID_SDK_TEMP_ZIP}\" can't be removed!" )
 
     if [ $CLEAN -eq 0 ]; then
         Debug_msg "Download SDK"
@@ -305,7 +305,7 @@ if [ $INSTALL_ANDROID -eq 1 ]; then
         mkdir -p ${ANDROID_HOME}/cmdline-tools
         unzip -q -d ${ANDROID_HOME}/cmdline-tools ${ANDROID_SDK_TEMP_ZIP}; Result_msg "cmdline_tools unzip failed!"
         mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest
-        rm ${ANDROID_SDK_TEMP_ZIP}; Result_msg "\"${ANDROID_SDK_TEMP_ZIP}\" can't be removed!"
+        rm -f ${ANDROID_SDK_TEMP_ZIP}; Result_msg "\"${ANDROID_SDK_TEMP_ZIP}\" can't be removed!"
 
         # Disable emulators, skdmanager packets removed:
         #	emulator
@@ -339,10 +339,13 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
     STATE_DIR='/tmp/root-state'
     ANDROID_SDK_ROOT='/opt/android-sdk'
 
+    # Clean gradle
+    [ -d ~/.gradle ] && ( rm -rf ~/.gradle; Result_msg "Gradle (home) was been removed" "Gradle (home) can't be removed!" )
+    [ -d /root/.gradle ] && ( rm -rf /root/.gradle; Result_msg "Gradle (root) was been removed" "Gradle (root) can't be removed!" )
+
     # Clean
     ALL_FILES=( ".bashrc" ".zshrc" )
     ALL_LINES=( "export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" "export PATH=\$PATH:\$ANDROID_SDK_ROOT/platform-tools" )
-
     for USER in /home/*/; do
         for FILE in "${ALL_FILES[@]}"; do
             FILERC="${USER}${FILE}"
@@ -366,12 +369,14 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
     done
 
     if [ $CLEAN -eq 0 ]; then
+
+        # Permissions
         chmod -R 0777 /tmp; Result_msg "Can't change /tmp directory permissions (to 0777)"
         [ ! -d $STATE_DIR ] && ( mkdir $STATE_DIR; Result_msg "Can't create $STATE_DIR directory" )
         chmod 0700 $STATE_DIR; Result_msg "Can't change $STATE_DIR directory permissions (to 0700)"
-
         chmod -R 777 "$ANDROID_SDK_ROOT"; Result_msg "Can't change "$ANDROID_SDK_ROOT" directory permissions (to 777)"
 
+        # Exports config
         for USER in /home/*/; do
             for FILE in "${ALL_FILES[@]}"; do
                 for LINE in "${ALL_LINES[@]}"; do
@@ -380,9 +385,26 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
                 done
             done
         done
+
+        # Replace adb (amd64) to arm64 version (installed with apt)
+        PATH_ADB=$(which adb)
+        cp $PATH_ADB $ANDROID_SDK_ROOT/platform-tools/adb > $OUT 2>&1
+        Result_msg "Adb replaced (amd64 to arm64)" "Can't copy adb to platform-tools"
+
+        # Replace aapt2 (amd) with arm64 executable
+        AAPT2_JAR=$(find /root/.gradle/ -type f -name aapt2-*-linux.jar)
+        if [ -z "$AAPT2_JAR" ]; then
+            $(return 1); Result_msg "Can't find aapt2-*-linux.jar"
+        fi
+
+        wget -P /tmp https://github.com/rendiix/termux-aapt/raw/main/prebuilt-binary/arm64/aapt2 > $OUT 2>&1; Result_msg "Can't download aapt2 binary"
+        jar -uvf "$AAPT2_JAR" /tmp/aapt2 > $OUT 2>&1
+        Result_msg "AAPT2 replaced (amd64 to arm64)" "Can't replace aapt2 binary with arm64 version"
+        rm -f /tmp/aapt2 > $OUT 2>&1
+
     fi
 fi
 
 echo ""
 Debug_msg "Finished"
-[ -f "$PREV_FILE" ] && rm "$PREV_FILE"
+[ -f "$PREV_FILE" ] && rm -f "$PREV_FILE"
