@@ -16,6 +16,7 @@ CPU: Broadcom BCM2711, Quad core Cortex-A72 (ARM v8) 64-bit SoC @ 1.5GHz\
 RAM: 4GB LPDDR4-3200 SDRAM
 
 ## Usage
+- Set executable: `sudo chmod a+x ./setup-RN-arm64.sh`
 - Get help: `sudo ./setup-RN-arm64.sh -h`
 - Get versions: `sudo ./setup-RN-arm64.sh -v`
 - Do nothing: `sudo ./setup-RN-arm64.sh -nu -np -nb -nn -na -nc`

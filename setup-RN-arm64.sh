@@ -30,6 +30,9 @@ NODE_VERSION=16.x
 # Other
 PREV_FILE='/tmp/.rnsetup'	# To prevent multiple setups
 
+ThrowError() {
+    return 1
+}
 
 Exit() {
     if [ $UNSAFE -eq 0 ]; then
@@ -342,7 +345,7 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
 
     # Clean gradle
     [ -d ~/.gradle ] && ( rm -rf ~/.gradle; Result_msg "Gradle (home) was been removed" "Gradle (home) can't be removed!" )
-    [ -d /root/.gradle ] && ( rm -rf /root/.gradle; Result_msg "Gradle (root) was been removed" "Gradle (root) can't be removed!" )
+    [ -d /root/.gradle ] && ( sudo rm -rf /root/.gradle; Result_msg "Gradle (root) was been removed" "Gradle (root) can't be removed!" )
 
     # Clean
     ALL_FILES=( ".bashrc" ".zshrc" )
@@ -391,10 +394,10 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
         BEFOREPATH=$(pwd)
         Debug_msg "Create temp project to build gradle (can take few minutes)" # Faster way ?
         cd /tmp
-        npx react-native /tmp/init rn_app_gradle > $OUT 2>&1; Result_msg "Can't create temp project"
-        cd /tmp/rn_app_gradle/android
-        ./gradlew app:installDebug > $OUT 2>&1 # Fail because it's builded to amd64, but gradle built
-        mkdir -p /tmp/; Result_msg "Can't create /tmp/gradle directory"
+        npx react-native init rn_app_gradle > $OUT 2>&1; Result_msg "Can't create temp project"
+        cd /tmp/rn_app_gradle
+        echo "sdk.dir=/opt/android-sdk" > ./android/local.properties
+        npx react-native run-android --no-jetifier > $OUT 2>&1 # Fail because it's builded for amd64, but gradle built
         cd $BEFOREPATH
         rm -rf /tmp/rn_app_gradle; Result_msg "Can't remove temp project"
 
@@ -404,14 +407,28 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
         Result_msg "Adb replaced (amd64 to arm64)" "Can't copy adb to platform-tools"
 
         # Replace aapt2 (amd) with arm64 executable
+        AAPT2_JARS=()
+
         AAPT2_JAR=$(find /root/.gradle/ -type f -name aapt2-*-linux.jar)
-        if [ -z "$AAPT2_JAR" ]; then
-            $(return 1); Result_msg "Can't find aapt2-*-linux.jar"
+        if [ -n "$AAPT2_JAR" ]; then
+            AAPT2_JARS+=($AAPT2_JAR)
+        fi
+        for USER in /home/*/; do
+            AAPT2_JAR=$(find ${USER}.gradle/ -type f -name aapt2-*-linux.jar)
+            if [ -n "$AAPT2_JAR" ]; then
+                AAPT2_JARS+=($AAPT2_JAR)
+            fi
+        done
+
+        if [ ${#AAPT2_JARS[@]} -eq 0 ]; then
+            ThrowError; Result_msg "Can't find aapt2-*-linux.jar"
         fi
 
         wget -P /tmp https://github.com/rendiix/termux-aapt/raw/main/prebuilt-binary/arm64/aapt2 > $OUT 2>&1; Result_msg "Can't download aapt2 binary"
-        jar -uvf "$AAPT2_JAR" /tmp/aapt2 > $OUT 2>&1
-        Result_msg "AAPT2 replaced (amd64 to arm64)" "Can't replace aapt2 binary with arm64 version"
+        for AAPT2_JAR_PATH in "${AAPT2_JARS[@]}"; do
+            jar -uvf "$AAPT2_JAR_PATH" /tmp/aapt2 > $OUT 2>&1
+            Result_msg "AAPT2 replaced by arm64 version \"$AAPT2_JAR_PATH\"" "Can't replace aapt2 binary with arm64 version"
+        done
         rm -f /tmp/aapt2 > $OUT 2>&1
 
     fi
