@@ -24,6 +24,7 @@ CMAKE_VERSION=3.18.1
 NDK_VERSION=r23
 ANDROID_BUILD_VERSION=31
 ANDROID_TOOLS_VERSION=30.0.3
+SDK_EMULATOR_VERSION=31.3.8
 SDK_VERSION=commandlinetools-linux-8512546_latest.zip
 NODE_VERSION=16.x
 
@@ -137,6 +138,7 @@ Print_versions() {
     VER_TXT+="NDK|$NDK_VERSION|sdkmanager\n"
     VER_TXT+="Android build|$ANDROID_BUILD_VERSION|sdkmanager\n"
     VER_TXT+="Android tools|$ANDROID_TOOLS_VERSION|sdkmanager\n"
+    VER_TXT+="SDK Emulator|$SDK_EMULATOR_VERSION|sdkmanager\n"
     VER_TXT+="npm|Latest|apt-get\n"
     VER_TXT+="react-native|Latest|npm\n"
     VER_TXT+="Node|$NODE_VERSION|https://deb.nodesource.com/setup_${NODE_VERSION}"
@@ -311,8 +313,7 @@ if [ $INSTALL_ANDROID -eq 1 ]; then
         mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest
         rm -f ${ANDROID_SDK_TEMP_ZIP}; Result_msg "\"${ANDROID_SDK_TEMP_ZIP}\" can't be removed!"
 
-        # Disable emulators, skdmanager packets removed:
-        #	emulator
+        # Skdmanager packets removed:
         #	system-images;android-21;google_apis;armeabi-v7a
 
         Debug_msg "Download platform-tools"
@@ -320,6 +321,7 @@ if [ $INSTALL_ANDROID -eq 1 ]; then
         yes | sudo sdkmanager "platform-tools" \
             "platforms;android-$ANDROID_BUILD_VERSION" \
             "build-tools;$ANDROID_TOOLS_VERSION" \
+            "emulator;$SDK_EMULATOR_VERSION" \
             "cmake;$CMAKE_VERSION" \
             "ndk;$NDK_VERSION" > $OUT
         Result_msg "SDK manager installations failed!"
@@ -340,11 +342,11 @@ fi
 if [ $INSTALL_CONFIG -eq 1 ]; then
 
     Debug_msg "> Configuration"
-    STATE_DIR='/tmp/root-state'
+    STATE_DIR='-state'
     ANDROID_SDK_ROOT='/opt/android-sdk'
 
     # Clean gradle
-    [ -d ~/.gradle ] && ( rm -rf ~/.gradle; Result_msg "Gradle (home) was been removed" "Gradle (home) can't be removed!" )
+    [ -d ~/.gradle ] && ( sudo rm -rf ~/.gradle; Result_msg "Gradle (home) was been removed" "Gradle (home) can't be removed!" )
     [ -d /root/.gradle ] && ( sudo rm -rf /root/.gradle; Result_msg "Gradle (root) was been removed" "Gradle (root) can't be removed!" )
 
     # Clean
@@ -375,10 +377,16 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
     if [ $CLEAN -eq 0 ]; then
 
         # Permissions
-        chmod -R 0777 /tmp; Result_msg "Can't change /tmp directory permissions (to 0777)"
-        [ ! -d $STATE_DIR ] && ( mkdir $STATE_DIR; Result_msg "Can't create $STATE_DIR directory" )
-        chmod 0700 $STATE_DIR; Result_msg "Can't change $STATE_DIR directory permissions (to 0700)"
-        chmod -R 777 "$ANDROID_SDK_ROOT"; Result_msg "Can't change "$ANDROID_SDK_ROOT" directory permissions (to 777)"
+        chmod -R 0777 /tmp; Result_msg "/tmp : 0777" "Can't change /tmp directory permissions (to 0777)"
+        chmod -R 777 "$ANDROID_SDK_ROOT"; Result_msg "$ANDROID_SDK_ROOT : 777" "Can't change "$ANDROID_SDK_ROOT" directory permissions (to 777)"
+
+        [ ! -d "/tmp/root-state" ] && ( mkdir "/tmp/root-state"; Result_msg "Can't create /tmp/root-state directory" )
+        chmod 0700 "/tmp/root-state"; Result_msg "/tmp/root-state : 0700" "Can't change /tmp/root-state directory permissions (to 0700)"
+        for USER in /home/*/; do
+            U=$(echo $USER | cut -d'/' -f3)
+            [ ! -d "/tmp/$U-state" ] && ( mkdir "/tmp/$U-state"; Result_msg "Can't create /tmp/$U-state directory" )
+            chmod 0700 "/tmp/$U-state"; Result_msg "/tmp/$U-state : 0700" "Can't change /tmp/$U-state directory permissions (to 0700)"
+        done
 
         # Exports config
         for USER in /home/*/; do
@@ -425,6 +433,7 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
         fi
 
         wget -P /tmp https://github.com/rendiix/termux-aapt/raw/main/prebuilt-binary/arm64/aapt2 > $OUT 2>&1; Result_msg "Can't download aapt2 binary"
+        chmod a+x /tmp/aapt2 > $OUT 2>&1; Result_msg "Can't change aapt2 binary permissions"
         for AAPT2_JAR_PATH in "${AAPT2_JARS[@]}"; do
             jar -uvf "$AAPT2_JAR_PATH" /tmp/aapt2 > $OUT 2>&1
             Result_msg "AAPT2 replaced by arm64 version \"$AAPT2_JAR_PATH\"" "Can't replace aapt2 binary with arm64 version"
