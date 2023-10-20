@@ -141,7 +141,7 @@ Print_versions() {
     VER_TXT+="SDK Emulator|$SDK_EMULATOR_VERSION|sdkmanager\n"
     VER_TXT+="npm|Latest|apt-get\n"
     VER_TXT+="react-native|Latest|npm\n"
-    VER_TXT+="Node|$NODE_MAJOR|https://deb.nodesource.com/setup_${NODE_MAJOR}"
+    VER_TXT+="Node|$NODE_MAJOR|https://github.com/nodesource/distributions"
 
     echo -e "$VER_TXT" | column -t -s "|" -c 50
     exit 0
