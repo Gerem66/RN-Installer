@@ -18,7 +18,7 @@ STAG="${GREEN}[+]${NO_COLOR}"		# Success tag
 ETAG="${RED}[-]${NO_COLOR}"		# Error tag
 
 # Versions
-BUCK_VERSION=2021.05.05.01
+BUCK_VERSION=v2022.05.05.01
 BUCK_JAVA_VERSION=11
 CMAKE_VERSION=3.18.1
 NDK_VERSION=r23
@@ -26,7 +26,7 @@ ANDROID_BUILD_VERSION=31
 ANDROID_TOOLS_VERSION=30.0.3
 SDK_EMULATOR_VERSION=31.3.8
 SDK_VERSION=commandlinetools-linux-8512546_latest.zip
-NODE_VERSION=16.x
+NODE_MAJOR=20
 
 # Other
 PREV_FILE='/tmp/.rnsetup'	# To prevent multiple setups
@@ -141,7 +141,7 @@ Print_versions() {
     VER_TXT+="SDK Emulator|$SDK_EMULATOR_VERSION|sdkmanager\n"
     VER_TXT+="npm|Latest|apt-get\n"
     VER_TXT+="react-native|Latest|npm\n"
-    VER_TXT+="Node|$NODE_VERSION|https://deb.nodesource.com/setup_${NODE_VERSION}"
+    VER_TXT+="Node|$NODE_MAJOR|https://deb.nodesource.com/setup_${NODE_MAJOR}"
 
     echo -e "$VER_TXT" | column -t -s "|" -c 50
     exit 0
@@ -208,13 +208,14 @@ if [ $INSTALL_PKGS -eq 1 ]; then
         nano \
         make \
         curl \
+        gnupg \
         cmake \
         unzip \
-        nodejs \
         screen \
         watchman \
         openjdk-11-jdk \
         openjdk-11-jre \
+        ca-certificates \
         android-tools-adb \
         python3 python3-distutils \
         > $OUT
@@ -242,7 +243,7 @@ if [ $INSTALL_BUCK -eq 1 ]; then
         Debug_msg "Download buck"
 
         [ $DEBUG -eq 0 ] && QUIET='--quiet' || QUIET=''
-        git clone $QUIET --depth 1 --branch v${BUCK_VERSION} https://github.com/facebook/buck.git > $OUT 2>&1; Result_msg "Buck download failed!"
+        git clone $QUIET --depth 1 --branch ${BUCK_VERSION} https://github.com/facebook/buck.git > $OUT 2>&1; Result_msg "Buck download failed!"
         cd buck
 
         Debug_msg "Build buck"
@@ -274,8 +275,13 @@ if [ $INSTALL_NODE -eq 1 ]; then
     #TODO - clean...
 
     if [ $CLEAN -eq 0 ]; then
-        curl -sL https://deb.nodesource.com/setup_${NODE_VERSION} | bash - > $OUT
-        Result_msg "Node downloading failed!"
+        curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+        Result_msg "Node keyring failed!"
+
+        if [ ! -d /etc/apt/keyrings/ ]; then
+            mkdir -p /etc/apt/keyrings/
+            echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+        fi
 
         [ $DEBUG -eq 0 ] && VERBOSE='-qq' || VERBOSE=''
         apt-get update $QUIET > $OUT; Result_msg "Update packages failed!"
@@ -317,8 +323,8 @@ if [ $INSTALL_ANDROID -eq 1 ]; then
         #	system-images;android-21;google_apis;armeabi-v7a
 
         Debug_msg "Download platform-tools"
-        yes | sudo sdkmanager --licenses > $OUT; Result_msg "SDK manager licenses not accepted!"
-        yes | sudo sdkmanager "platform-tools" \
+        yes | sdkmanager --licenses > $OUT; Result_msg "SDK manager licenses not accepted!"
+        yes | sdkmanager "platform-tools" \
             "platforms;android-$ANDROID_BUILD_VERSION" \
             "build-tools;$ANDROID_TOOLS_VERSION" \
             "emulator;$SDK_EMULATOR_VERSION" \
@@ -346,32 +352,34 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
     ANDROID_SDK_ROOT='/opt/android-sdk'
 
     # Clean gradle
-    [ -d ~/.gradle ] && ( sudo rm -rf ~/.gradle; Result_msg "Gradle (home) was been removed" "Gradle (home) can't be removed!" )
-    [ -d /root/.gradle ] && ( sudo rm -rf /root/.gradle; Result_msg "Gradle (root) was been removed" "Gradle (root) can't be removed!" )
+    [ -d ~/.gradle ] && ( rm -rf ~/.gradle; Result_msg "Gradle (home) was been removed" "Gradle (home) can't be removed!" )
+    [ -d /root/.gradle ] && ( rm -rf /root/.gradle; Result_msg "Gradle (root) was been removed" "Gradle (root) can't be removed!" )
 
     # Clean
     ALL_FILES=( ".bashrc" ".zshrc" )
     ALL_LINES=( "export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" "export PATH=\$PATH:\$ANDROID_SDK_ROOT/platform-tools" )
-    for USER in /home/*/; do
-        for FILE in "${ALL_FILES[@]}"; do
-            FILERC="${USER}${FILE}"
-            if [ ! -f ${FILERC} ]; then
-                continue
-            fi
-
-            for LINE in "${ALL_LINES[@]}"; do
-                LINE_NB=$(GetLine "$FILERC" "$LINE")
-                LINE_NB_STATUS=$?
-
-                if [ $LINE_NB_STATUS -ne 0 ] || [ -z $LINE_NB ]; then
+    for USER in /root/ /home/*/; do
+        if [ -d "$USER" ]; then
+            for FILE in "${ALL_FILES[@]}"; do
+                FILERC="${USER}${FILE}"
+                if [ ! -f ${FILERC} ]; then
                     continue
                 fi
-                if [ $LINE_NB -gt 0 ]; then
-                    RemoveLine "$FILERC" "$LINE_NB"
-                    Result_msg "Line \"${LINE}\" can't be removed from file \"$FILERC\"!"
-                fi
+
+                for LINE in "${ALL_LINES[@]}"; do
+                    LINE_NB=$(GetLine "$FILERC" "$LINE")
+                    LINE_NB_STATUS=$?
+
+                    if [ $LINE_NB_STATUS -ne 0 ] || [ -z $LINE_NB ]; then
+                        continue
+                    fi
+                    if [ $LINE_NB -gt 0 ]; then
+                        RemoveLine "$FILERC" "$LINE_NB"
+                        Result_msg "Line \"${LINE}\" can't be removed from file \"$FILERC\"!"
+                    fi
+                done
             done
-        done
+        fi
     done
 
     if [ $CLEAN -eq 0 ]; then
@@ -382,20 +390,24 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
 
         [ ! -d "/tmp/root-state" ] && ( mkdir "/tmp/root-state"; Result_msg "Can't create /tmp/root-state directory" )
         chmod 0700 "/tmp/root-state"; Result_msg "/tmp/root-state : 0700" "Can't change /tmp/root-state directory permissions (to 0700)"
-        for USER in /home/*/; do
-            U=$(echo $USER | cut -d'/' -f3)
-            [ ! -d "/tmp/$U-state" ] && ( mkdir "/tmp/$U-state"; Result_msg "Can't create /tmp/$U-state directory" )
-            chmod 0700 "/tmp/$U-state"; Result_msg "/tmp/$U-state : 0700" "Can't change /tmp/$U-state directory permissions (to 0700)"
+        for USER in /root/ /home/*/; do
+            if [ -d "$USER" ]; then
+                U=$(echo $USER | cut -d'/' -f3)
+                [ ! -d "/tmp/$U-state" ] && ( mkdir "/tmp/$U-state"; Result_msg "Can't create /tmp/$U-state directory" )
+                chmod 0700 "/tmp/$U-state"; Result_msg "/tmp/$U-state : 0700" "Can't change /tmp/$U-state directory permissions (to 0700)"
+            fi
         done
 
         # Exports config
-        for USER in /home/*/; do
-            for FILE in "${ALL_FILES[@]}"; do
-                for LINE in "${ALL_LINES[@]}"; do
-                    FILERC="${USER}${FILE}"
-                    echo "$LINE" >> "$FILERC"; Result_msg "Can't add configuration to \"$FILERC\""
+        for USER in /root/ /home/*/; do
+            if [ -d "$USER" ]; then
+                for FILE in "${ALL_FILES[@]}"; do
+                    for LINE in "${ALL_LINES[@]}"; do
+                        FILERC="${USER}${FILE}"
+                        echo "$LINE" >> "$FILERC"; Result_msg "Can't add configuration to \"$FILERC\""
+                    done
                 done
-            done
+            fi
         done
 
         # Build gradle
@@ -403,9 +415,9 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
         Debug_msg "Create temp project to build gradle (can take few minutes)" # Faster way ?
         cd /tmp
         npx react-native init rn_app_gradle > $OUT 2>&1; Result_msg "Can't create temp project"
-        cd /tmp/rn_app_gradle
-        echo "sdk.dir=/opt/android-sdk" > ./android/local.properties
-        npx react-native run-android --no-jetifier > $OUT 2>&1 # Fail because it's builded for amd64, but gradle built
+        cd /tmp/rn_app_gradle/android
+        echo "sdk.dir=/opt/android-sdk" > ./local.properties
+        ./gradlew build > $OUT 2>&1 # Fail because it's builded for amd64, but gradle built
         cd $BEFOREPATH
         rm -rf /tmp/rn_app_gradle; Result_msg "Can't remove temp project"
 
@@ -421,10 +433,12 @@ if [ $INSTALL_CONFIG -eq 1 ]; then
         if [ -n "$AAPT2_JAR" ]; then
             AAPT2_JARS+=($AAPT2_JAR)
         fi
-        for USER in /home/*/; do
-            AAPT2_JAR=$(find ${USER}.gradle/ -type f -name aapt2-*-linux.jar)
-            if [ -n "$AAPT2_JAR" ]; then
-                AAPT2_JARS+=($AAPT2_JAR)
+        for USER in /root/ /home/*/; do
+            if [ -d "$USER" ]; then
+                AAPT2_JAR=$(find ${USER}.gradle/ -type f -name aapt2-*-linux.jar)
+                if [ -n "$AAPT2_JAR" ]; then
+                    AAPT2_JARS+=($AAPT2_JAR)
+                fi
             fi
         done
 
